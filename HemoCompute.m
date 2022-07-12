@@ -71,8 +71,8 @@ Filters.Camera = Infos.AcqInfoStream.Camera_Model;
 clear Infos;
 
 %Computation itself:
-A = ioi_epsilon_pathlength('Hillman', 100, 60, 40, Filters);
-Ainv = pinv(A);
+A = ioi_epsilon_pathlength('Hillman', 100, 60, 40, Filters);%A is the epsilon*D for HbO A(:,1) and HbR A(:,2) for each LED: Red = A(1,:), Green = A(2,:), Yellow = A(3,:).
+Ainv = pinv(A); %A is the inverse of epsilon*D for HbO Ainv(1,:) and HbR Ainv(2,:) for each LED: Red = Ainv(:,1), Green = Ainv(:,2), Yellow = Ainv(:,3).
 
 MemFact = 16;
 f = fdesign.lowpass('N,F3dB', 4, 1, Freq); %Low Pass
@@ -88,7 +88,10 @@ HbR = zeros(NbPix(1), NbPix(2), NbFrames, 'single');
 h = waitbar(0,'Computing');
 nIter = NbPix(2)/MemFact;
 for indP = 1:nIter
-    if( fidR )
+    Red = zeros(NbPix(1)*MemFact,NbFrames,'single');
+    Green = zeros(NbPix(1)*MemFact,NbFrames,'single');
+    Yel = zeros(NbPix(1)*MemFact,NbFrames,'single');
+    if exist('fidR')
         fseek(fidR, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Red = fread(fidR,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Red = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Red)'))';
@@ -97,7 +100,7 @@ for indP = 1:nIter
         Red = (Red)./(tmp);
         Red = -log10(Red);
     end
-    if( fidG )
+    if exist('fidG')
         fseek(fidG, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Green = fread(fidG,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Green = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Green)'))';
@@ -106,7 +109,7 @@ for indP = 1:nIter
         Green = (Green)./(tmp);
         Green = -log10(Green);
     end
-    if( fidY )
+    if exist('fidY')
         fseek(fidY, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Yel = fread(fidY,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Yel = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Yel)'))';
@@ -114,7 +117,7 @@ for indP = 1:nIter
         tmp(tmp<min(Yel(:))) = min(Yel(:));
         Yel = (Yel)./(tmp);
         Yel = -log10(Yel);
-    end
+    end    
     clear tmp;
     Hbs = Ainv*([Red(:), Green(:), Yel(:)]') .* 1e6;
     clear Red Green Yel;
