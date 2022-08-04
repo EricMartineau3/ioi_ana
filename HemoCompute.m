@@ -57,7 +57,7 @@ NbPix = double(NbPix);
 % Filter setting
 switch( lower(FilterSet) )
     case 'gcamp'
-        Filters.Excitation = 'GCaMP';
+        Filters.Excitation = 'none'; %modified from GCaMP in original labeo script because we don't have that filter in front of the 3-color LED
         Filters.Emission = 'GCaMP';
     case 'jrgeco'
         Filters.Excitation = 'none';
