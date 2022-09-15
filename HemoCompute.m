@@ -26,6 +26,9 @@ end
 
 %Files Opening:
 NbFrames = inf;
+fidR = 0;
+fidY = 0;
+fidG = 0;
 for indC = 1:size(Illumination,2)
     switch lower(Illumination{indC})
         case 'red'
@@ -57,7 +60,7 @@ NbPix = double(NbPix);
 % Filter setting
 switch( lower(FilterSet) )
     case 'gcamp'
-        Filters.Excitation = 'none'; %modified from GCaMP in original labeo script because we don't have that filter in front of the 3-color LED
+        Filters.Excitation = 'none';
         Filters.Emission = 'GCaMP';
     case 'jrgeco'
         Filters.Excitation = 'none';
@@ -71,8 +74,7 @@ Filters.Camera = Infos.AcqInfoStream.Camera_Model;
 clear Infos;
 
 %Computation itself:
-A = ioi_epsilon_pathlength('Hillman', 100, 60, 40, Filters);%A is the epsilon*D for HbO A(:,1) and HbR A(:,2) for each LED: Red = A(1,:), Green = A(2,:), Yellow = A(3,:).
-Ainv = pinv(A); %A is the inverse of epsilon*D for HbO Ainv(1,:) and HbR Ainv(2,:) for each LED: Red = Ainv(:,1), Green = Ainv(:,2), Yellow = Ainv(:,3).
+A = ioi_epsilon_pathlength('Hillman', 100, 60, 40, Filters);
 
 MemFact = 16;
 f = fdesign.lowpass('N,F3dB', 4, 1, Freq); %Low Pass
@@ -88,10 +90,7 @@ HbR = zeros(NbPix(1), NbPix(2), NbFrames, 'single');
 h = waitbar(0,'Computing');
 nIter = NbPix(2)/MemFact;
 for indP = 1:nIter
-    Red = zeros(NbPix(1)*MemFact,NbFrames,'single');
-    Green = zeros(NbPix(1)*MemFact,NbFrames,'single');
-    Yel = zeros(NbPix(1)*MemFact,NbFrames,'single');
-    if exist('fidR')
+    if( fidR )
         fseek(fidR, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Red = fread(fidR,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Red = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Red)'))';
@@ -100,7 +99,7 @@ for indP = 1:nIter
         Red = (Red)./(tmp);
         Red = -log10(Red);
     end
-    if exist('fidG')
+    if( fidG )
         fseek(fidG, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Green = fread(fidG,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Green = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Green)'))';
@@ -109,7 +108,7 @@ for indP = 1:nIter
         Green = (Green)./(tmp);
         Green = -log10(Green);
     end
-    if exist('fidY')
+    if( fidY )
         fseek(fidY, (indP-1)*NbPix(1)*MemFact*4,'bof');
         Yel = fread(fidY,[NbPix(1)*MemFact, NbFrames],Precision,(NbPix(1)*NbPix(2) - NbPix(1)*MemFact)*4);
         Yel = single(filtfilt(lpass_high.sosMatrix, lpass_high.ScaleValues, double(Yel)'))';
@@ -117,10 +116,25 @@ for indP = 1:nIter
         tmp(tmp<min(Yel(:))) = min(Yel(:));
         Yel = (Yel)./(tmp);
         Yel = -log10(Yel);
-    end    
+    end
     clear tmp;
-    Hbs = Ainv*([Red(:), Green(:), Yel(:)]') .* 1e6;
-    clear Red Green Yel;
+    if(  fidR*fidG*fidY > 0)
+        Ainv = pinv(A);
+        Hbs = Ainv*([Red(:), Green(:), Yel(:)]') .* 1e6;
+        clear Red Green Yel;
+    elseif( fidR*fidG > 0)
+        Ainv = pinv(A(1:2,:));
+        Hbs = Ainv*([Red(:), Green(:)]') .* 1e6;
+        clear Red Green;
+    elseif( fidG*fidY > 0)
+        Ainv = pinv(A(2:3,:));
+        Hbs = Ainv*([Green(:), Yel(:)]') .* 1e6;
+        clear Green Yel;
+    else
+        Ainv = pinv(A([1 3],:));
+        Hbs = Ainv*([Red(:), Yel(:)]') .* 1e6;
+        clear Red Yel;
+    end
     
     Hbs = reshape(Hbs, 2, NbPix(1), MemFact, []);
     Hbs = real(Hbs);
