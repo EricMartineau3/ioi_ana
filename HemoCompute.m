@@ -60,7 +60,7 @@ NbPix = double(NbPix);
 % Filter setting
 switch( lower(FilterSet) )
     case 'gcamp'
-        Filters.Excitation = 'GCaMP';
+        Filters.Excitation = 'none';
         Filters.Emission = 'GCaMP';
     case 'jrgeco'
         Filters.Excitation = 'none';
